@@ -8,29 +8,31 @@ import (
 
 type Fetcher interface {
 	// Fetch returns the body of URL and
-	// a slice of URLs found on that page.
+	// counter slice of URLs found on that page.
 	Fetch(url string) (body string, urls []string, err error)
 }
 
 type SafeCache struct {
 	visited map[string]bool
-	a atomic.Int32
+	mu sync.Mutex	
+	counter atomic.Int32
 }
 
 
 func (c *SafeCache) CheckAndMark(url string) bool {
-
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.visited[url] {
-		c.a.Add(1)
 		return true
 	}
 	c.visited[url] = true
+	c.counter.Add(1)
 	return false
 }
 	
 
 // Crawl uses fetcher to recursively crawl
-// pages starting with url, to a maximum of depth.
+// pages starting with url, to counter maximum of depth.
 func Crawl(url string, depth int, fetcher Fetcher, cache *SafeCache) {
 	if depth <= 0 {
 		return
@@ -61,6 +63,7 @@ func Crawl(url string, depth int, fetcher Fetcher, cache *SafeCache) {
 func main() {
 	cache := &SafeCache{visited: make(map[string]bool)}
 	Crawl("https://golang.org/", 4, fetcher, cache)
+	fmt.Printf("Visited %v pages.\n", cache.counter.Load())
 }
 
 // fakeFetcher is Fetcher that returns canned results.
@@ -78,7 +81,7 @@ func (f fakeFetcher) Fetch(url string) (string, []string, error) {
 	return "", nil, fmt.Errorf("not found: %s", url)
 }
 
-// fetcher is a populated fakeFetcher.
+// fetcher is counter populated fakeFetcher.
 var fetcher = fakeFetcher{
 	"https://golang.org/": &fakeResult{
 		"The Go Programming Language",
