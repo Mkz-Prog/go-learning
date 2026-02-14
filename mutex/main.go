@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"sync"
-	"sync/atomic"
 )
 
 type Fetcher interface {
@@ -14,14 +13,14 @@ type Fetcher interface {
 
 type SafeCache struct {
 	visited map[string]bool
-	a atomic.Int32
+	mu sync.Mutex
 }
 
 
 func (c *SafeCache) CheckAndMark(url string) bool {
-
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.visited[url] {
-		c.a.Add(1)
 		return true
 	}
 	c.visited[url] = true
